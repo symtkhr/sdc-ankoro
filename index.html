@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>はいはいさらすさらす</title>
+<style>
+h1 {
+  margin:0;
+  font-size: 20px;
+}
+.article {
+    border: 1px solid brown;
+    background-color: #a97;
+    display: block;
+    width: auto;
+    line-height: 25px;
+    cursor: pointer;
+    margin: 3px;
+}
+
+.article .td:nth-child(1)
+{
+    float:left;
+    text-align:left;
+    margin:3px;
+}
+.article .td:nth-child(3)
+{
+    padding:2px;
+    font-weight:bold;
+    color:white;
+    min-height: 20px;
+}
+.article .td:nth-child(2)
+{
+    float:right;
+    border-radius:20px;
+    background-color:#dcc;
+    font-size:12px;
+    line-height: 12px;
+    margin: 4px;
+    padding:3px 7px;
+}
+.article .td:nth-child(4)
+{
+    line-height:15px;
+}
+.article .td:nth-child(5)
+{
+    white-space:normal;
+    //display:none;
+    background-color:#ddb;
+    padding: 2px;
+}
+ .article .td:nth-child(5) span {
+        font-size:10pt;
+        line-height:12pt;
+        display:block;
+     white-space:normal;
+     background-color: #eec;
+     border: 1px solid gray;
+     padding: 1px;
+    border-radius: 4px;
+}
+.lyricbox {
+    background-color: #eec;
+    display: block;
+    border: 1px solid brown;
+    border-radius: 6px;
+    padding: 3px;
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 80%;
+    padding: 5px;
+    display: none;
+}
+.lyric { background-color: #fff; border:dotted 2px #a97; padding:10px; margin:10px; width:auto;  }
+#menu { margin-bottom: 70px; }
+#audio { display:block; position:fixed; bottom:0; right:0; width:100%; background-color:#dcb; }
+audio { width:100%; height:40px; margin:3px 0;}
+
+</style>
+</head>
+<body>
+  <div style="float:right;"><a href="#fulltext">全表示</a></div>
+  <h1><a href="#">はいはいさらすさらす 原液</a></h1>
+  <div id=menu>Loading...</div>
+  <div id=audio>(ここにプレイヤ表示)</div>
+</body>
+<script>
+const $id = (id) => document.getElementById(id);
+const $q = (query) => [...document.querySelectorAll(query)];
+
+const getfile = (fname, cb) => {
+    const ajax = new XMLHttpRequest();
+    ajax.onreadystatechange = () => {
+        if (ajax.readyState != 4) return;
+        if (ajax.status != 200) return;
+        cb(ajax);
+    };
+    ajax.open("GET", fname, true);
+    ajax.send(null);
+};
+
+const articles = {
+    table:[],
+};
+
+const onloader = () => {
+
+    const dump_row = (v,i) => {
+        if (!v.id) v.id = "none";
+        let row = [];
+        {
+            let ret = "<span class=id>" + i + "</span><br>"
+            row.push(ret);
+        }
+        {
+            let date = v.date.split(":").slice(1).join(":").trim().split(" ");
+            let ymd = date[0].split("/");
+            let date0 = [ymd[2],ymd[0],ymd[1]].join("-") + " " + date[1];
+            let ret =  `<span>${v.category.split(":").slice(1)}</span> | <span>${date0}</span>`;
+            row.push(ret);
+            //row.push(`<audio style="width:100%;" controls src="./audio/april_fool.mp3" type="audio/mp3">hoge</audio>`);
+            //row.push(`<a href="#${v.audio}">再生</a> | <a href="#">オケ</a> | <a href="#${v.id}">詞</a> | <a href="#">覚書</a>`);
+        }
+        try {
+            let ret = v.title.split(":").slice(1).join(":");
+            row.push(ret);
+        } catch(e) {console.log(v);}
+
+        return `<div class=article onclick="location.href='#${v.id}'">`
+            + row.map(h => "<div class=td>" + h + "</div>").join("") + "</div>"
+            + `<div class=lyricbox>${v.body}</div>`;
+    };
+
+
+    const draw_table = () => {
+        let subset = articles.table.filter(a => a.category.indexOf("他") < 0);
+        $id("menu").innerHTML = `<div>[${subset.length}記事]</div>`
+            + `<div id=articlelist>` + subset.map((v, i) => dump_row(v,i+1)).join("") + "</div>";
+    };
+
+    const draw_page = () => {
+        let id = location.hash.split("#").slice(1);
+        if (id[0] == "fulltext") {
+            $q(".lyricbox").map($dom => $dom.style.display = "block");
+            return;
+        }
+        $q(".lyricbox").map($dom => $dom.style.display = "none");
+        let article = articles.table.find(v => v.id==id);
+        if (!article) return;
+
+        let idx = articles.table.findIndex(v => v.id==id);
+        $q(".lyricbox")[idx].style.display = "block";
+        $q(".article")[idx].scrollIntoView();
+        if (!article.audio) return;
+
+        let k = "http://unknown774.up.seesaa.net/image/" + article.audio;
+        $id("audio").innerHTML = `<audio controls><source src="${k}" type="audio/ogg"></audio>`;
+    };
+
+    // events
+    window.addEventListener('hashchange', () => { draw_page(); });
+
+    if (0) {
+        $id("search").onkeydown = (e) => {
+            if (e.keyCode != 13) return;
+            location.href = "#q=" + $id("search").value;
+        };
+    }
+
+
+    draw_table();
+    draw_page();
+
+    // disable anchors since most of them are dead links
+    $q("a").filter($dom => $dom.href.indexOf(location.host) < 0).map($dom => $dom.onclick = () => false);
+};
+
+
+
+  const body_parse = (body) => {
+      let rows = body.split("\n");
+      let cats = rows.map(row => {
+          let title = row.trim().match(/^<b>.+?<\/b>/);
+          if (title) return {t: title};
+          let audio = row.indexOf(`class="audio-link"`) != -1;
+          if (audio) return {a: row};
+          let footer = "詞|投下|曲|編曲|歌".split("|").some(act => row.indexOf("（" + act) != -1) && row.indexOf("：") != -1;
+          if (footer) return {f: row};
+          return {l: row};
+      });
+
+      let posh = cats.findIndex(s => s.t);
+      let posl = cats.findIndex(s => s.a);
+      let posf = cats.findIndex(s => s.f);
+      let head = rows.slice(2, posh);
+      let lyric = rows.slice(posl + 1, posf);
+      let foot = rows.slice(posf);
+      if ((rows[posh]||"?").indexOf("Utrillo")!=-1)
+      console.log(posh, posl, posf, head, lyric, foot);
+      return {
+          body:`<div class=head>${head.join("<br/>")}</div>`
+              +`<fieldset class=lyric><legend>${rows[posh]||{t:""}.t}</legend>${lyric.join("<br/>")}</fieldset>`
+              +`<div class=foot style="white-space:pre;">${foot.join("\n")}</div>`,
+          audio: rows[posl],
+      };
+  };
+
+const main = () => {
+    getfile("./mtarchive-unknown774.log", (log) => {
+        articles.table = log.response.split("--------\nAUTHOR:").map(v => {
+            let data = v.split("\n-----").filter(v => v.trim());
+            let head = data[0].split("\n");
+            let title = head.find(v => v.indexOf("TITLE:") == 0);
+            let date = head.find(v => v.indexOf("DATE:") == 0);
+            let category = head.find(v => v.indexOf("CATEGORY:") == 0);
+            let id = head.find(v => v.indexOf("BASENAME:") == 0);
+            let bp = body_parse(data[1]);
+            let body = bp.body;
+            let audio = (bp.audio||"").split("</a>").join("").split(">").pop().trim();
+            return { title: title, date:date, category:category, body: body, id: id.split(":").pop().trim(), audio: audio };
+        }).reverse();
+        onloader();
+    });
+};
+
+main();
+
+</script>
+</html>
