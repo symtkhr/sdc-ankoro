@@ -8,6 +8,9 @@ h1 {
   margin:0;
   font-size: 20px;
 }
+hr {
+    border: solid white 2px;
+}
 .article {
     border: 1px solid brown;
     background-color: #a97;
@@ -62,8 +65,7 @@ h1 {
      padding: 1px;
     border-radius: 4px;
 }
-.lyricbox {
-    background-color: #eec;
+.lyricbox, .detail {
     display: block;
     border: 1px solid brown;
     border-radius: 6px;
@@ -73,8 +75,12 @@ h1 {
     font-size: 80%;
     padding: 5px;
     display: none;
+    white-space:pre;
+    overflow-wrap: break-word;
 }
-.lyric { background-color: #fff; border:dotted 2px #a97; padding:10px; margin:10px; width:auto;  }
+.lyricbox { background-color: #eec; }
+.detail { background-color: #ddd; }
+.lyric { background-color: #fff; border:dotted 2px #a97; padding:10px; margin:10px; width:auto; }
 #menu { margin-bottom: 70px; }
 #audio { display:block; position:fixed; bottom:0; right:0; width:100%; background-color:#dcb; }
 audio { width:100%; height:40px; margin:3px 0;}
@@ -131,7 +137,8 @@ const onloader = () => {
 
         return `<div class=article onclick="location.href='#${v.id}'">`
             + row.map(h => "<div class=td>" + h + "</div>").join("") + "</div>"
-            + `<div class=lyricbox>${v.body}</div>`;
+            + `<div class=lyricbox>${v.article.map(v => v.body).join("<hr>") }</div>`
+            + (v.detail ? `<div class=detail>${v.detail}</div>` : "");
     };
 
 
@@ -144,19 +151,19 @@ const onloader = () => {
     const draw_page = () => {
         let id = location.hash.split("#").slice(1);
         if (id[0] == "fulltext") {
-            $q(".lyricbox").map($dom => $dom.style.display = "block");
+            $q(".lyricbox, .detail").map($dom => $dom.style.display = "block");
             return;
         }
-        $q(".lyricbox").map($dom => $dom.style.display = "none");
+        $q(".lyricbox, .detail").map($dom => $dom.style.display = "none");
         let article = articles.table.find(v => v.id==id);
         if (!article) return;
 
         let idx = articles.table.findIndex(v => v.id==id);
         $q(".lyricbox")[idx].style.display = "block";
         $q(".article")[idx].scrollIntoView();
-        if (!article.audio) return;
+        if (!article.article.find(v => v.audio)) return;
 
-        let k = "http://unknown774.up.seesaa.net/image/" + article.audio;
+        let k = article.article[0].audio;
         $id("audio").innerHTML = `<audio controls><source src="${k}" type="audio/ogg"></audio>`;
     };
 
@@ -180,36 +187,66 @@ const onloader = () => {
 
 
 
-  const body_parse = (body) => {
-      let rows = body.split("\n");
-      let cats = rows.map(row => {
-          let title = row.trim().match(/^<b>.+?<\/b>/);
-          if (title) return {t: title};
-          let audio = row.indexOf(`class="audio-link"`) != -1;
-          if (audio) return {a: row};
-          let footer = "詞|投下|曲|編曲|歌".split("|").some(act => row.indexOf("（" + act) != -1) && row.indexOf("：") != -1;
-          if (footer) return {f: row};
-          return {l: row};
-      });
+  const body_parse = (bx, ext) => {
+      return bx.split("<hr>").map((body,i) => {
+          let rows = body.split("\n").slice(2);
+          let cats = rows.map(row => {
+              let title = row.trim().match(/^<b>.+?<\/b>/);
+              if (title) return {t: title[0]};
+              let audio = row.indexOf(`class="audio-link"`) != -1;
+              if (audio) return {a: row};
+              let credit = "詞|投下|曲|編曲|歌".split("|").some(act => row.indexOf("（" + act) != -1) && row.indexOf("：") != -1;
+              if (credit) return {f: row};
+              let hr = row.match(/<hr/);
+              if (hr) return {h:row};
+              return {l: row};
+          });
 
-      let posh = cats.findIndex(s => s.t);
-      let posl = cats.findIndex(s => s.a);
-      let posf = cats.findIndex(s => s.f);
-      let head = rows.slice(2, posh);
-      let lyric = rows.slice(posl + 1, posf);
-      let foot = rows.slice(posf);
-      if ((rows[posh]||"?").indexOf("Utrillo")!=-1)
-      console.log(posh, posl, posf, head, lyric, foot);
-      return {
-          body:`<div class=head>${head.join("<br/>")}</div>`
-              +`<fieldset class=lyric><legend>${rows[posh]||{t:""}.t}</legend>${lyric.join("<br/>")}</fieldset>`
-              +`<div class=foot style="white-space:pre;">${foot.join("\n")}</div>`,
-          audio: rows[posl],
-      };
+          // case: in order of title -> audio -> footer
+          if (cats.map(s => Object.keys(s).shift()).filter(k => k != "l").join("").match(/^t?af+h*$/)) {
+              
+              let posh = cats.findIndex(s => s.t || s.a);
+              let posl = cats.findIndex(s => s.a);
+              let posc = cats.findIndex(s => s.f);
+              let posf = cats.findIndex(s => s.h);
+              
+              let head = rows.slice(0, posh).join("\n").trim();
+              let title = rows[posh];
+              let lyric = rows.slice(posl + 1, posc).join("\n").trim();
+              let credit = rows.slice(posc, posf < 0 ? rows.length : posf).join("\n").trim();
+              let footer = (posf < 0) ? "" : rows.slice(posf + 1).join("\n").trim();
+              footer += ext.split("\n").slice(2).join("\n"); // Todo: push last
+
+              let audio = (rows[posl]||"").split('"').find(v=>v.indexOf('unknown774.up.seesaa.net')!=-1);
+
+              return {
+                  body:`<div class=head>${head}</div>`
+                      +`<fieldset class=lyric><legend>${title}</legend>${lyric}</fieldset>`
+                      +`<div class=credit>${credit}</div>`
+                      +(footer?`<div class=foot style="background:#cca; padding:6px;">${footer}</div>`:""),
+                  audio: audio,
+              };
+              if ((rows[posh]||"?").indexOf("Utrillo")!=-1)
+                  console.log(posh, posl, posf, head, lyric, foot);
+          }
+          if (i==0)
+          console.log(JSON.stringify(cats[0]),"\n",
+                      cats.map(v=>Object.keys(v).join("")).join("").split("l").join("_"));
+          return {
+              body: `<div class=foot style="background:#cca; padding:6px;">${body.trim()}</div>`,
+              audio: (cats.find(s => s.a)||{a:""}).a,
+          };
+
+          return {
+              body: "<textarea style='width:100%; height:300px;'>" + cats.map(v=>JSON.stringify(v)+",").join("\n") + ext + "</textarea>",
+              audio: (cats.find(s => s.a)||{a:""}).a,
+          };
+      });
   };
 
 const main = () => {
     getfile("./mtarchive-unknown774.log", (log) => {
+        let expage = [];
         articles.table = log.response.split("--------\nAUTHOR:").map(v => {
             let data = v.split("\n-----").filter(v => v.trim());
             let head = data[0].split("\n");
@@ -217,11 +254,24 @@ const main = () => {
             let date = head.find(v => v.indexOf("DATE:") == 0);
             let category = head.find(v => v.indexOf("CATEGORY:") == 0);
             let id = head.find(v => v.indexOf("BASENAME:") == 0);
-            let bp = body_parse(data[1]);
-            let body = bp.body;
-            let audio = (bp.audio||"").split("</a>").join("").split(">").pop().trim();
-            return { title: title, date:date, category:category, body: body, id: id.split(":").pop().trim(), audio: audio };
+            let bp = body_parse(data[1], data[2]);
+            if (!bp[0].audio) { expage.push([bp[0].body, data[2]]); }
+            return { title: title, date:date, category:category, article: bp, id: id.split(":").pop().trim() };
         }).reverse();
+        let songdata = expage.filter(v => v[0].indexOf("楽曲諸データ") != -1).map(v => v[1])
+            .join("").split("<hr>").map(v => {
+                let data = v.trim();
+                let id = data.split(".html").shift().split("/").pop();
+                if (data.indexOf("with_the_big_hands") != -1) id = "112614176";
+                return {id: id + ".html", data: data};
+            });
+        articles.table.map(v => {
+            let k = songdata.find(sd => sd.id == v.id);
+            if (!k)  console.log(v);
+            if (!k) return v;
+            v.detail = k.data;
+            return v;
+        });
         onloader();
     });
 };
