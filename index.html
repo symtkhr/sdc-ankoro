@@ -75,7 +75,7 @@ hr {
     font-size: 80%;
     padding: 5px;
     display: none;
-    white-space:pre;
+    white-space:pre-wrap;
     overflow-wrap: break-word;
 }
 .lyricbox { background-color: #eec; }
@@ -135,8 +135,8 @@ const onloader = () => {
             row.push(ret);
         } catch(e) {console.log(v);}
 
-        return `<div class=article onclick="location.href='#${v.id}'">`
-            + row.map(h => "<div class=td>" + h + "</div>").join("") + "</div>"
+        return `<a href="#${v.id}" style="text-decoration:none; color:black;"><div class=article>`
+            + row.map(h => "<div class=td>" + h + "</div>").join("") + "</div></a>"
             + `<div class=lyricbox>${v.article.map(v => v.body).join("<hr>") }</div>`
             + (v.detail ? `<div class=detail>${v.detail}</div>` : "");
     };
@@ -161,6 +161,10 @@ const onloader = () => {
         let idx = articles.table.findIndex(v => v.id==id);
         $q(".lyricbox")[idx].style.display = "block";
         $q(".article")[idx].scrollIntoView();
+        $q(".article").map($dom => $dom.onclick = null);
+        $q(".article")[idx].onclick = () => {
+            $q(".lyricbox")[idx].nextSibling.style.display = "block";
+        };
         if (!article.article.find(v => v.audio)) return;
 
         let k = article.article[0].audio;
